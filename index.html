@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#182238">
+<title>KatKot chat</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b110d;color:#e8f5eb;font-family:system-ui,sans-serif}
+header{padding:16px;background:#14251a;border-bottom:1px solid #294b32}
+header h1{margin:0;color:#55e889;font-size:25px}
+header p{margin:5px 0 0;color:#a6c7af;font-size:13px}
+main{max-width:600px;margin:auto;padding:16px}
+.panel{background:#142019;border:1px solid #294b32;border-radius:16px;padding:20px;margin-top:35px}
+h2{color:#65ed96}
+input{width:100%;padding:13px;border-radius:12px;border:1px solid #365540;background:#0b110d;color:white;font-size:16px;margin:8px 0}
+button{border:0;border-radius:12px;padding:12px 18px;background:#39d879;color:#082010;font-size:15px;font-weight:bold;cursor:pointer}
+.full{width:100%;margin-top:8px}
+#chat{display:none}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+#messages{display:flex;flex-direction:column;gap:12px;padding:20px 0;min-height:280px}
+.message{max-width:85%;padding:10px 13px;border-radius:15px;overflow-wrap:anywhere;white-space:pre-wrap}
+.mine{align-self:flex-start;background:#b8f5c9;color:#153b22;border-bottom-right-radius:4px}
+.other{align-self:flex-end;background:#203328;color:#e8f5eb;border-bottom-left-radius:4px}
+
+.profile-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-left: 7px;
+  border: 2px solid #39ff88;
+  cursor: pointer;
+}
+.sender{display:block;font-size:12px;font-weight:bold;margin-bottom:5px;color:#20804a}
+.other .sender{color:#76e99a}
+.time{display:block;text-align:left;font-size:10px;margin-top:6px;opacity:.75}
+.composer{display:flex;gap:8px;align-items:center}
+.composer input{flex:1;min-width:0;margin:0}
+.composer button{padding:13px}
+.note{color:#9ab2a0;font-size:12px;line-height:1.8}
+#changeName{background:#294333;color:#dfffe8;padding:8px 10px;font-size:12px}
+
+#fileButton, #recordButton { padding: 10px; min-width: 44px; }
+#recordButton.recording { background: #ff7777; color: #240000; }
+.attachment { max-width: 90%; padding: 10px; border-radius: 14px; background: #203328; overflow-wrap: anywhere; }
+.attachment img, .attachment video { display: block; max-width: 100%; max-height: 260px; border-radius: 10px; margin-top: 8px; }
+.attachment audio { display: block; max-width: 100%; margin-top: 8px; }
+
+
+:root{
+  --bg:#101827;--surface:#1b263b;--surface2:#24334b;
+  --accent:#8b7cff;--accent2:#42d6c5;--text:#f1f4fb;
+  --muted:#aebbd0;--border:#35445e;
+}
+body{background:var(--bg);color:var(--text)}
+header{background:#182238;border-bottom:1px solid var(--border)}
+header h1{color:#b6adff}
+header p,.note{color:var(--muted)}
+.panel{background:var(--surface);border-color:var(--border)}
+h2{color:#c2baff}
+input,select,textarea{
+  background:#111b2c!important;color:var(--text)!important;
+  border:1px solid #43516b!important;border-radius:12px;
+}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+button{background:var(--accent);color:#fff;transition:filter .15s}
+button:active{filter:brightness(.88)}
+#changeName{background:#35445e;color:#f1f4fb}
+.mine{background:#d8d5ff;color:#202344}
+.other,.attachment{background:#26364d;color:#f1f4fb}
+.sender{color:#6f62dc}
+.other .sender{color:#66dfd0}
+.profile-avatar{border-color:var(--accent2)}
+#photoStage{position:relative;width:100%;max-width:360px;aspect-ratio:1;margin:12px auto;
+ overflow:hidden;border:2px solid var(--accent);border-radius:16px;background:#101827;touch-action:none}
+#photoCanvas{width:100%;height:100%;display:block;touch-action:none}
+#cropFrame{position:absolute;left:10%;top:10%;width:80%;height:80%;
+ border:2px solid white;box-shadow:0 0 0 999px #0007;touch-action:none;cursor:move}
+.crop-handle{position:absolute;width:18px;height:18px;border:2px solid white;
+ background:var(--accent);border-radius:50%;touch-action:none}
+.crop-nw{left:-9px;top:-9px;cursor:nwse-resize}
+.crop-ne{right:-9px;top:-9px;cursor:nesw-resize}
+.crop-sw{left:-9px;bottom:-9px;cursor:nesw-resize}
+.crop-se{right:-9px;bottom:-9px;cursor:nwse-resize}
+#photoEditor label{display:block;margin-top:10px;color:var(--text)}
+#saveEditedPhoto{background:var(--accent2);color:#10232d}
+
+</style>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>🐱 KatKot chat</h1>
+  <p>دردشتك تبدأ من هنا 💚</p>
+</header>
+
+<main>
+  <section id="login" class="panel">
+    <h2>أهلًا بك في KatKot chat</h2>
+    <p>اكتب اسمك قبل الدخول إلى المحادثة.</p>
+    <form id="loginForm">
+      <input id="username" maxlength="30" placeholder="اسم المستخدم" required autocomplete="nickname">
+      <label for="profilePicture">📸 اختر صورتك الشخصية (اختياري)</label>
+      <input id="profilePicture" type="file" accept="image/*">
+      <button class="full" type="submit">دخول إلى الدردشة</button>
+    </form>
+    <p class="note">اختر اسمًا يظهر مع رسائلك على هذا الجهاز.</p>
+  </section>
+
+
+  <section id="photoEditor" class="panel" style="display:none;max-width:520px;margin:20px auto;">
+    <h2>🖼️ تعديل الصورة الشخصية</h2>
+    <p class="note">اسحب الصورة أو كبّرها داخل الإطار، واكتب نصًا عليها إن أردت.</p>
+    <div id="photoStage">
+      <canvas id="photoCanvas" width="600" height="600"></canvas>
+      <div id="cropFrame" aria-label="اسحب الإطار لتحديد الجزء المطلوب قصه">
+        <span class="crop-handle crop-nw" data-handle="nw"></span>
+        <span class="crop-handle crop-ne" data-handle="ne"></span>
+        <span class="crop-handle crop-sw" data-handle="sw"></span>
+        <span class="crop-handle crop-se" data-handle="se"></span>
+      </div>
+    </div>
+    <p class="note">حرّك إطار القص أو اسحب زواياه. اسحب الصورة للتعديل، ويمكن استخدام إصبعين للتكبير.</p>
+    <label for="photoZoom">تكبير الصورة</label>
+    <input id="photoZoom" type="range" min="1" max="3" step="0.05" value="1" style="width:100%;">
+    <label for="photoText">✍️ اكتب على الصورة</label>
+    <input id="photoText" type="text" maxlength="50" placeholder="اكتب نصًا اختياريًا" style="width:100%;box-sizing:border-box;margin:8px 0;">
+    <label for="photoTextColor">لون الكتابة</label>
+    <select id="photoTextColor" style="width:100%;margin:8px 0;">
+      <option value="#ffffff">أبيض</option>
+      <option value="#39ff88">أخضر</option>
+      <option value="#ffdf45">أصفر</option>
+      <option value="#ff5555">أحمر</option>
+      <option value="#000000">أسود</option>
+    </select>
+    <button type="button" id="saveEditedPhoto">💾 اعتماد الصورة</button>
+    <button type="button" id="cancelPhotoEdit">إلغاء</button>
+    <p id="photoEditorStatus" class="note" aria-live="polite"></p>
+  </section>
+
+  <section id="chat">
+    <div class="topline">
+      <div>
+        <strong>المحادثة</strong>
+        <div class="note">أنت: <span id="currentName"></span></div>
+      </div>
+      <div class="menu-wrap" style="position:relative">
+      <button id="changeName" type="button" aria-label="القائمة" aria-expanded="false" style="font-size:25px;padding:2px 12px">⋮</button>
+      <button id="leaveRoom" type="button" style="display:none;padding:3px 6px;font-size:11px;min-width:0" title="الخروج من الغرفة">خروج</button>
+      <div id="profileMenu" style="display:none;position:absolute;left:0;top:100%;z-index:100;min-width:175px;padding:8px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:0 8px 24px #0005">
+        <button type="button" id="menuOpenProfile" style="display:block;width:100%;margin:4px 0">👤 الملف الشخصي</button>
+        <button type="button" id="menuChangeName" style="display:block;width:100%;margin:4px 0">✏️ تغيير الاسم</button>
+        <button type="button" id="menuLogout" style="display:block;width:100%;margin:4px 0">↩️ خروج</button>
+      </div>
+    </div>
+    </div>
+
+    <section id="roomsPanel" class="panel" style="margin:14px 0;padding:14px">
+      <h2 style="margin-top:0">🏠 غرف المحادثة</h2>
+      <p class="note">أنشئ غرفة جديدة أو أدخل رقم غرفة للانضمام إليها.</p>
+      <button type="button" id="createRoom" class="full">➕ إنشاء غرفة</button>
+      <label for="roomCode">رقم الغرفة</label>
+      <input id="roomCode" inputmode="numeric" maxlength="6" placeholder="أدخل رقم الغرفة المكوّن من 6 أرقام">
+      <button type="button" id="joinRoom" class="full">🚪 الانضمام إلى غرفة</button>
+      <p id="roomStatus" class="note" aria-live="polite">لم تنضم إلى غرفة بعد.</p>
+    </section>
+    <div id="messages" aria-live="polite"></div>
+
+    <input id="fileInput" type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.zip" multiple hidden>
+    <form id="chatForm" class="composer">
+      <button type="button" id="fileButton" aria-label="إرفاق ملفات">📎</button>
+      <input id="messageInput" maxlength="2000" placeholder="اكتب رسالتك..." autocomplete="off">
+      <button type="button" id="recordButton" aria-label="تسجيل صوتي">🎙️</button>
+      <button type="submit">إرسال</button>
+    </form>
+    <p id="mediaStatus" class="note" aria-live="polite"></p>
+
+    <p class="note">
+      🟢 رسائلك فاتحة، ورسائل الآخرين داكنة.
+      هذه النسخة تحفظ المحادثة محليًا على هذا الجهاز فقط.
+      لم يتم تفعيل الاتصال بهواتف أخرى بعد.
+    </p>
+  </section>
+
+  <section id="profilePage" style="display:none; max-width:520px; margin:20px auto; padding:20px; border:1px solid #39ff88; border-radius:16px; background:#07130d; color:#39ff88;">
+    <h2 style="text-align:center;">👤 الملف الشخصي</h2>
+    <div style="text-align:center; margin:18px 0;">
+      <img id="profilePreview" alt="الصورة الشخصية" style="width:100px;height:100px;object-fit:cover;border-radius:50%;border:2px solid #39ff88;">
+    </div>
+    <p id="profileName" style="text-align:center;font-size:20px;"></p>
+    <label for="bioInput">✍️ السيرة الذاتية</label>
+    <textarea id="bioInput" maxlength="300" rows="4" placeholder="اكتب نبذة قصيرة عن نفسك..." style="display:block;box-sizing:border-box;width:100%;margin:10px 0;padding:12px;border:1px solid #39ff88;border-radius:8px;background:#0b1b12;color:#fff;"></textarea>
+    <p id="bioCount" class="note">0 / 300</p>
+    <button type="button" id="saveProfile">💾 حفظ الملف الشخصي</button>
+    <button type="button" id="closeProfile">رجوع إلى الدردشة</button>
+    <p id="profileStatus" class="note" aria-live="polite"></p>
+  </section>
+
+</main>
+
+<script>
+const login = document.getElementById('login');
+const chat = document.getElementById('chat');
+const loginForm = document.getElementById('loginForm');
+const usernameInput = document.getElementById('username');
+const currentName = document.getElementById('currentName');
+const messages = document.getElementById('messages');
+const messageInput = document.getElementById('messageInput');
+
+let username = '';
+
+const socket = io();
+let currentRoom = "";
+
+const roomStatus = document.getElementById("roomStatus");
+const roomCodeInput = document.getElementById("roomCode");
+
+const leaveRoomButton = document.getElementById("leaveRoom");
+
+leaveRoomButton.addEventListener("click", function() {
+  if (currentRoom) {
+    socket.emit("leave_room");
+  }
+});
+
+socket.on("room_left", function(data) {
+  currentRoom = "";
+  leaveRoomButton.style.display = "none";
+  document.getElementById("roomsPanel").style.display = "block";
+  messages.replaceChildren();
+  roomStatus.textContent = "خرجت من الغرفة. يمكنك إنشاء غرفة أو الانضمام إلى أخرى.";
+});
+
+document.getElementById("createRoom").addEventListener("click", function() {
+  socket.emit("create_room");
+});
+
+document.getElementById("joinRoom").addEventListener("click", function() {
+  const room = roomCodeInput.value.trim();
+  if (!/^\d{6}$/.test(room)) {
+    roomStatus.textContent = "أدخل رقم غرفة مكوّنًا من 6 أرقام.";
+    return;
+  }
+  socket.emit("join_room", {room: room});
+});
+
+socket.on("connect", function() {
+  roomStatus.textContent = "متصل بالخادم. أنشئ غرفة أو انضم إلى غرفة.";
+});
+
+socket.on("connect_error", function() {
+  roomStatus.textContent = "تعذر الاتصال بالخادم. تأكد أن التطبيق يعمل.";
+});
+
+socket.on("room_created", function(data) {
+  currentRoom = data.room;
+  roomCodeInput.value = currentRoom;
+  messages.replaceChildren();
+  document.getElementById("roomsPanel").style.display = "none";
+  leaveRoomButton.style.display = "inline-block";
+  roomStatus.textContent = "أنت الآن في الغرفة رقم " + currentRoom;
+});
+
+socket.on("room_joined", function(data) {
+  currentRoom = data.room;
+  messages.replaceChildren();
+  (data.messages || []).forEach(function(m) {
+    addMessage(m.name, m.text, m.name === username);
+  });
+  document.getElementById("roomsPanel").style.display = "none";
+  leaveRoomButton.style.display = "inline-block";
+  roomStatus.textContent = "أنت الآن في الغرفة رقم " + currentRoom;
+});
+
+socket.on("room_error", function(data) {
+  roomStatus.textContent = data.message || "حدث خطأ في الغرفة.";
+});
+
+socket.on("room_notice", function(data) {
+  roomStatus.textContent = data.message || "انضم عضو جديد.";
+});
+
+socket.on("new_message", function(data) {
+  addMessage(data.name, data.text, data.name === username);
+});
+
+
+let profilePictureData = '';
+
+const profilePictureInput = document.getElementById('profilePicture');
+
+try {
+  profilePictureData = localStorage.getItem('katkot_profile_picture') || '';
+} catch (_) {}
+
+profilePictureInput.addEventListener('change', function() {
+  const file = this.files && this.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    alert('من فضلك اختر ملف صورة.');
+    this.value = '';
+    return;
+  }
+
+  if (file.size > 20 * 1024 * 1024) {
+    alert('حجم الصورة يجب ألا يتجاوز 20 ميجابايت.');
+    this.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function() {
+    profilePictureData = reader.result;
+    try {
+      localStorage.setItem('katkot_profile_picture', profilePictureData);
+      alert('تم حفظ صورتك الشخصية على هذا الجهاز.');
+    } catch (_) {
+      alert('تعذر حفظ الصورة. جرّب صورة أصغر.');
+    }
+  };
+  reader.readAsDataURL(file);
+});
+
+
+
+const profilePage = document.getElementById('profilePage');
+const profilePreview = document.getElementById('profilePreview');
+const profileName = document.getElementById('profileName');
+const bioInput = document.getElementById('bioInput');
+const bioCount = document.getElementById('bioCount');
+const profileStatus = document.getElementById('profileStatus');
+
+const defaultAvatar = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#173c2a"/><circle cx="32" cy="23" r="12" fill="#39ff88"/><path d="M10 60c2-15 11-22 22-22s20 7 22 22" fill="#39ff88"/></svg>'
+);
+
+function openProfile(name) {
+  const isMe = name === username;
+  profileName.textContent = name;
+  profilePreview.src = isMe && profilePictureData ? profilePictureData : defaultAvatar;
+  bioInput.value = isMe ? (localStorage.getItem('katkot_bio') || '') : '';
+  bioInput.disabled = !isMe;
+  document.getElementById('saveProfile').style.display = isMe ? '' : 'none';
+  bioCount.textContent = bioInput.value.length + ' / 300';
+  profileStatus.textContent = isMe ? 'يمكنك تعديل سيرتك الذاتية وحفظها.' : 'يمكن عرض ملفات المستخدمين الآخرين عند ربط الخادم المشترك.';
+  chat.style.display = 'none';
+  login.style.display = 'none';
+  profilePage.style.display = 'block';
+}
+
+bioInput.addEventListener('input', function() {
+  bioCount.textContent = this.value.length + ' / 300';
+});
+
+document.getElementById('saveProfile').addEventListener('click', function() {
+  try {
+    localStorage.setItem('katkot_bio', bioInput.value.trim());
+    profileStatus.textContent = 'تم حفظ السيرة الذاتية على هذا الجهاز ✅';
+  } catch (_) {
+    profileStatus.textContent = 'تعذر الحفظ؛ قد تكون مساحة التخزين ممتلئة.';
+  }
+});
+
+document.getElementById('closeProfile').addEventListener('click', function() {
+  profilePage.style.display = 'none';
+  if (username) {
+    chat.style.display = 'block';
+    login.style.display = 'none';
+  } else {
+    chat.style.display = 'none';
+    login.style.display = 'block';
+  }
+});
+
+
+const photoEditor = document.getElementById('photoEditor');
+const photoCanvas = document.getElementById('photoCanvas');
+const photoCtx = photoCanvas.getContext('2d');
+const photoZoom = document.getElementById('photoZoom');
+const photoText = document.getElementById('photoText');
+const photoTextColor = document.getElementById('photoTextColor');
+const photoEditorStatus = document.getElementById('photoEditorStatus');
+let photoSource = null;
+
+
+const photoStage = document.getElementById('photoStage');
+const cropFrame = document.getElementById('cropFrame');
+let imageScale = 1, imageX = 0, imageY = 0;
+let crop = {x: 0.1, y: 0.1, w: 0.8, h: 0.8};
+let activeCrop = null, activePointers = new Map(), pinchStart = null;
+
+function setCropStyle() {
+  cropFrame.style.left = (crop.x * 100) + '%';
+  cropFrame.style.top = (crop.y * 100) + '%';
+  cropFrame.style.width = (crop.w * 100) + '%';
+  cropFrame.style.height = (crop.h * 100) + '%';
+}
+
+function drawEditedPhoto() {
+  if (!photoSource) return;
+  const w = photoCanvas.width, h = photoCanvas.height;
+  const base = Math.max(w / photoSource.width, h / photoSource.height);
+  const scale = base * imageScale * Number(photoZoom.value);
+  const dw = photoSource.width * scale, dh = photoSource.height * scale;
+  photoCtx.clearRect(0, 0, w, h);
+  photoCtx.fillStyle = '#101827';
+  photoCtx.fillRect(0, 0, w, h);
+  photoCtx.drawImage(photoSource, (w-dw)/2 + imageX, (h-dh)/2 + imageY, dw, dh);
+
+  const text = photoText.value.trim();
+  if (text) {
+    const fontSize = Math.max(24, Math.min(54, 600 / Math.max(8, text.length) * 1.2));
+    photoCtx.font = 'bold ' + fontSize + 'px sans-serif';
+    photoCtx.textAlign = 'center';
+    photoCtx.textBaseline = 'bottom';
+    photoCtx.lineWidth = 5;
+    photoCtx.strokeStyle = 'rgba(0,0,0,0.7)';
+    photoCtx.strokeText(text, w/2, h-28, w-36);
+    photoCtx.fillStyle = photoTextColor.value;
+    photoCtx.fillText(text, w/2, h-28, w-36);
+  }
+}
+
+function showPhotoEditor(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  if (file.size > 20 * 1024 * 1024) {
+    alert('حجم الصورة يجب ألا يتجاوز 20 ميجابايت.');
+    profilePictureInput.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function() {
+    const img = new Image();
+    img.onload = function() {
+      photoSource = img;
+      imageScale = 1; imageX = 0; imageY = 0;
+      crop = {x: 0.1, y: 0.1, w: 0.8, h: 0.8};
+      photoZoom.value = '1';
+      photoText.value = '';
+      photoEditorStatus.textContent = '';
+      setCropStyle();
+      drawEditedPhoto();
+      login.style.display = 'none';
+      chat.style.display = 'none';
+      photoEditor.style.display = 'block';
+    };
+    img.onerror = function() { alert('تعذر فتح الصورة. جرّب صورة أخرى.'); };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+profilePictureInput.addEventListener('change', function() {
+  const file = this.files && this.files[0];
+  if (file) showPhotoEditor(file);
+});
+
+photoZoom.addEventListener('input', drawEditedPhoto);
+photoText.addEventListener('input', drawEditedPhoto);
+photoTextColor.addEventListener('change', drawEditedPhoto);
+
+// تحريك إطار القص وتغيير حجمه من الزوايا
+cropFrame.addEventListener('pointerdown', function(e) {
+  if (e.pointerType === 'touch' && activeCrop) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const r = photoStage.getBoundingClientRect();
+  const handle = e.target.dataset.handle || '';
+  activeCrop = {
+    id:e.pointerId, handle, startX:e.clientX, startY:e.clientY,
+    crop:{...crop}, stageW:r.width, stageH:r.height
+  };
+  cropFrame.setPointerCapture(e.pointerId);
+});
+cropFrame.addEventListener('pointermove', function(e) {
+  if (!activeCrop || activeCrop.id !== e.pointerId) return;
+  const dx = (e.clientX-activeCrop.startX)/activeCrop.stageW;
+  const dy = (e.clientY-activeCrop.startY)/activeCrop.stageH;
+  const c = activeCrop.crop, min = 0.15;
+  if (!activeCrop.handle) {
+    crop.x = Math.max(0, Math.min(1-c.w, c.x+dx));
+    crop.y = Math.max(0, Math.min(1-c.h, c.y+dy));
+  } else {
+    let left=c.x, top=c.y, right=c.x+c.w, bottom=c.y+c.h;
+    if (activeCrop.handle.includes('w')) left=Math.max(0,Math.min(right-min,left+dx));
+    if (activeCrop.handle.includes('e')) right=Math.min(1,Math.max(left+min,right+dx));
+    if (activeCrop.handle.includes('n')) top=Math.max(0,Math.min(bottom-min,top+dy));
+    if (activeCrop.handle.includes('s')) bottom=Math.min(1,Math.max(top+min,bottom+dy));
+    crop={x:left,y:top,w:right-left,h:bottom-top};
+  }
+  setCropStyle();
+});
+function endCrop(e) {
+  if (activeCrop && activeCrop.id === e.pointerId) activeCrop=null;
+}
+cropFrame.addEventListener('pointerup', endCrop);
+cropFrame.addEventListener('pointercancel', endCrop);
+
+// سحب الصورة بإصبع واحد، وتكبيرها بإصبعين على المساحة خارج إطار القص
+photoStage.addEventListener('pointerdown', function(e) {
+  if (e.target.closest('#cropFrame')) return;
+  e.preventDefault();
+  photoStage.setPointerCapture(e.pointerId);
+  activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if (activePointers.size===2) {
+    const pts=[...activePointers.values()];
+    pinchStart={distance:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),scale:imageScale};
+  } else {
+    pinchStart={x:e.clientX,y:e.clientY,px:imageX,py:imageY,scale:imageScale};
+  }
+});
+photoStage.addEventListener('pointermove', function(e) {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if (activePointers.size===2 && pinchStart && pinchStart.distance) {
+    const pts=[...activePointers.values()];
+    const d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+    imageScale=Math.max(0.5,Math.min(4,pinchStart.scale*d/pinchStart.distance));
+    drawEditedPhoto();
+  } else if (activePointers.size===1 && pinchStart && pinchStart.x!==undefined) {
+    const r=photoStage.getBoundingClientRect();
+    imageX=pinchStart.px+(e.clientX-pinchStart.x)*600/r.width;
+    imageY=pinchStart.py+(e.clientY-pinchStart.y)*600/r.height;
+    drawEditedPhoto();
+  }
+});
+function endImagePointer(e) {
+  activePointers.delete(e.pointerId);
+  pinchStart=null;
+  if (activePointers.size===1) {
+    const [id,pt]=[...activePointers.entries()][0];
+    pinchStart={x:pt.x,y:pt.y,px:imageX,py:imageY,scale:imageScale};
+  }
+}
+photoStage.addEventListener('pointerup',endImagePointer);
+photoStage.addEventListener('pointercancel',endImagePointer);
+
+document.getElementById('saveEditedPhoto').addEventListener('click', function() {
+  if (!photoSource) {
+    photoEditorStatus.textContent = 'اختر صورة أولًا.';
+    return;
+  }
+  try {
+    const out=document.createElement('canvas');
+    out.width=600; out.height=600;
+    const ctx=out.getContext('2d');
+    const sx=Math.round(crop.x*photoCanvas.width);
+    const sy=Math.round(crop.y*photoCanvas.height);
+    const sw=Math.max(1,Math.round(crop.w*photoCanvas.width));
+    const sh=Math.max(1,Math.round(crop.h*photoCanvas.height));
+    ctx.drawImage(photoCanvas,sx,sy,sw,sh,0,0,600,600);
+    const data=out.toDataURL('image/jpeg',0.88);
+    localStorage.setItem('katkot_profile_picture',data);
+    profilePictureData=data;
+    photoEditorStatus.textContent='تم قص الصورة وحفظها على هذا الجهاز ✅';
+    photoEditor.style.display='none';
+    login.style.display='block';
+    usernameInput.focus();
+  } catch (_) {
+    photoEditorStatus.textContent='تعذر الحفظ. جرّب صورة أصغر.';
+  }
+});
+
+document.getElementById('cancelPhotoEdit').addEventListener('click', function() {
+  photoEditor.style.display='none';
+  login.style.display='block';
+  photoSource=null;
+});
+
+function showPhotoEditor(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  if (file.size > 20 * 1024 * 1024) {
+    alert('حجم الصورة يجب ألا يتجاوز 20 ميجابايت.');
+    profilePictureInput.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function() {
+    const img = new Image();
+    img.onload = function() {
+      photoSource = img;
+      photoZoom.value = '1';
+      photoText.value = '';
+      photoEditorStatus.textContent = '';
+      drawEditedPhoto();
+      login.style.display = 'none';
+      chat.style.display = 'none';
+      photoEditor.style.display = 'block';
+    };
+    img.onerror = function() {
+      alert('تعذر فتح الصورة. جرّب صورة أخرى.');
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+profilePictureInput.addEventListener('change', function() {
+  const file = this.files && this.files[0];
+  if (file) showPhotoEditor(file);
+});
+
+photoZoom.addEventListener('input', drawEditedPhoto);
+photoText.addEventListener('input', drawEditedPhoto);
+photoTextColor.addEventListener('change', drawEditedPhoto);
+
+document.getElementById('saveEditedPhoto').addEventListener('click', function() {
+  if (!photoSource) {
+    photoEditorStatus.textContent = 'اختر صورة أولًا.';
+    return;
+  }
+  try {
+    const data = photoCanvas.toDataURL('image/jpeg', 0.85);
+    localStorage.setItem('katkot_profile_picture', data);
+    profilePictureData = data;
+    photoEditorStatus.textContent = 'تم حفظ الصورة المعدّلة على هذا الجهاز ✅';
+    photoEditor.style.display = 'none';
+    login.style.display = 'block';
+    usernameInput.focus();
+  } catch (_) {
+    photoEditorStatus.textContent = 'تعذر الحفظ. جرّب صورة أصغر.';
+  }
+});
+
+document.getElementById('cancelPhotoEdit').addEventListener('click', function() {
+  photoEditor.style.display = 'none';
+  login.style.display = 'block';
+  photoSource = null;
+});
+
+function enterChat(name) {
+  username = name.trim().slice(0, 30);
+  if (!username) return;
+
+  try { localStorage.setItem('katkot_username', username); } catch (_) {}
+
+  currentName.textContent = username;
+  login.style.display = 'none';
+  chat.style.display = 'block';
+  messageInput.focus();
+}
+
+function showLogin() {
+  chat.style.display = 'none';
+  login.style.display = 'block';
+  usernameInput.value = username;
+  usernameInput.focus();
+}
+
+function addMessage(name, text, mine) {
+  const bubble = document.createElement('div');
+  bubble.className = 'message ' + (mine ? 'mine' : 'other');
+
+  const sender = document.createElement('span');
+  sender.className = 'sender';
+
+  const avatar = document.createElement('img');
+  avatar.className = 'profile-avatar';
+  avatar.alt = 'الصورة الشخصية';
+  avatar.src = (name === username && profilePictureData)
+    ? profilePictureData
+    : 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="#173c2a"/><circle cx="32" cy="23" r="12" fill="#39ff88"/><path d="M10 60c2-15 11-22 22-22s20 7 22 22" fill="#39ff88"/></svg>'
+      );
+
+  avatar.addEventListener('click', function() {
+    openProfile(name);
+  });
+
+  sender.append(avatar, document.createTextNode(' ' + name));
+  sender.style.cursor = 'pointer';
+  sender.addEventListener('click', function() {
+    openProfile(name);
+  });
+
+  const content = document.createElement('span');
+  content.textContent = text;
+
+  const time = document.createElement('span');
+  time.className = 'time';
+  time.textContent = new Date().toLocaleTimeString('ar-EG', {
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  bubble.append(sender, content, time);
+  messages.appendChild(bubble);
+  bubble.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+}
+
+loginForm.addEventListener('submit', function(event) {
+  event.preventDefault();
+  enterChat(usernameInput.value);
+});
+
+document.getElementById('chatForm').addEventListener('submit', function(event) {
+  event.preventDefault();
+  const text = messageInput.value.trim();
+  if (!text || !username) return;
+
+  if (!currentRoom) {
+    roomStatus.textContent = 'أنشئ غرفة أو انضم إلى غرفة أولًا.';
+    return;
+  }
+  socket.emit('send_message', {room: currentRoom, name: username, text: text});
+  messageInput.value = '';
+  messageInput.focus();
+});
+
+const profileMenu = document.getElementById('profileMenu');
+const menuButton = document.getElementById('changeName');
+
+menuButton.addEventListener('click', function(event) {
+  event.stopPropagation();
+  const opening = profileMenu.style.display === 'none';
+  profileMenu.style.display = opening ? 'block' : 'none';
+  menuButton.setAttribute('aria-expanded', String(opening));
+});
+
+document.addEventListener('click', function(event) {
+  if (!event.target.closest('.menu-wrap')) {
+    profileMenu.style.display = 'none';
+    menuButton.setAttribute('aria-expanded', 'false');
+  }
+});
+
+document.getElementById('menuOpenProfile').addEventListener('click', function() {
+  profileMenu.style.display = 'none';
+  menuButton.setAttribute('aria-expanded', 'false');
+  openProfile(username);
+});
+
+document.getElementById('menuChangeName').addEventListener('click', function() {
+  profileMenu.style.display = 'none';
+  menuButton.setAttribute('aria-expanded', 'false');
+  showLogin();
+});
+
+document.getElementById('menuLogout').addEventListener('click', function() {
+  profileMenu.style.display = 'none';
+  menuButton.setAttribute('aria-expanded', 'false');
+  showLogin();
+});
+
+
+const fileInput = document.getElementById('fileInput');
+const fileButton = document.getElementById('fileButton');
+const recordButton = document.getElementById('recordButton');
+const mediaStatus = document.getElementById('mediaStatus');
+
+fileButton.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', () => {
+  for (const file of fileInput.files) {
+    const url = URL.createObjectURL(file);
+    const card = document.createElement('div');
+    card.className = 'attachment';
+    const label = document.createElement('div');
+    label.textContent = username + ' — ' + file.name;
+    card.appendChild(label);
+
+    let preview;
+    if (file.type.startsWith('image/')) {
+      preview = document.createElement('img');
+      preview.alt = file.name;
+      preview.src = url;
+    } else if (file.type.startsWith('video/')) {
+      preview = document.createElement('video');
+      preview.controls = true;
+      preview.src = url;
+    } else if (file.type.startsWith('audio/')) {
+      preview = document.createElement('audio');
+      preview.controls = true;
+      preview.src = url;
+    } else {
+      preview = document.createElement('a');
+      preview.href = url;
+      preview.download = file.name;
+      preview.textContent = 'فتح أو حفظ الملف: ' + file.name;
+      preview.style.color = '#8cebad';
+    }
+    card.appendChild(preview);
+    messages.appendChild(card);
+  }
+  fileInput.value = '';
+  mediaStatus.textContent = 'تمت إضافة المرفق للعرض على هذا الجهاز فقط.';
+});
+
+let recorder = null;
+let audioChunks = [];
+let micStream = null;
+
+recordButton.addEventListener('click', async () => {
+  if (recorder && recorder.state === 'recording') {
+    recorder.stop();
+    recordButton.textContent = '🎙️';
+    recordButton.classList.remove('recording');
+    mediaStatus.textContent = 'جارٍ تجهيز التسجيل...';
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia ||
+      !window.MediaRecorder) {
+    mediaStatus.textContent = 'التسجيل غير مدعوم في هذا المتصفح.';
+    return;
+  }
+
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({audio: true});
+    audioChunks = [];
+    recorder = new MediaRecorder(micStream);
+
+    recorder.ondataavailable = event => {
+      if (event.data.size > 0) audioChunks.push(event.data);
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(audioChunks, {
+        type: recorder.mimeType || 'audio/webm'
+      });
+      const url = URL.createObjectURL(blob);
+      const card = document.createElement('div');
+      card.className = 'attachment';
+
+      const label = document.createElement('div');
+      label.textContent = username + ' — رسالة صوتية';
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.src = url;
+      card.append(label, audio);
+      messages.appendChild(card);
+
+      if (micStream) micStream.getTracks().forEach(track => track.stop());
+      micStream = null;
+      mediaStatus.textContent = 'تم تجهيز التسجيل محليًا؛ لم يُرسل إلى هاتف آخر.';
+    };
+
+    recorder.start();
+    recordButton.textContent = '⏹️';
+    recordButton.classList.add('recording');
+    mediaStatus.textContent = 'جارٍ التسجيل... اضغط زر الإيقاف عند الانتهاء.';
+  } catch (error) {
+    mediaStatus.textContent = 'تعذر استخدام الميكروفون. تحقق من إذن الميكروفون للمتصفح.';
+    if (micStream) micStream.getTracks().forEach(track => track.stop());
+    micStream = null;
+  }
+});
+
+try {
+  const savedName = localStorage.getItem('katkot_username');
+  if (savedName) enterChat(savedName);
+} catch (_) {}
+</script>
+</body>
+</html>
